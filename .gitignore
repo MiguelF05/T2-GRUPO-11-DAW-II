@@ -1,0 +1,38 @@
+# Maven / build
+target/
+*.class
+*.jar
+*.war
+*.ear
+*.zip
+*.tar.gz
+
+# Maven wrapper
+!.mvn/wrapper/maven-wrapper.jar
+
+# Spring Boot / H2
+*.log
+*.db
+*.mv.db
+*.trace.db
+HELP.md
+
+# IDEs
+.idea/
+*.iml
+*.iws
+*.ipr
+.vscode/
+.settings/
+.project
+.classpath
+.factorypath
+.springBeans
+.sts4-cache/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Env
+.env
