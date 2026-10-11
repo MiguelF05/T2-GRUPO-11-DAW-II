@@ -1,0 +1,101 @@
+{
+  "info": {
+    "name": "PAGOYA T2 GRUPO 11 - Reclamos y Resolucion",
+    "_postman_id": "pagoya-t2-grupo11",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "Coleccion T2 GRUPO 11 PAGOYA Peru: P1 Eureka, P2 Reclamos (registro, consulta, actualizacion), P3 Resolucion via Feign. Orden: Eureka -> Reclamos -> Resolucion."
+  },
+  "variable": [
+    { "key": "eurekaUrl", "value": "http://localhost:8761" },
+    { "key": "reclamosUrl", "value": "http://localhost:8300" },
+    { "key": "resolucionUrl", "value": "http://localhost:8100" },
+    { "key": "numreclamo", "value": "1" }
+  ],
+  "item": [
+    {
+      "name": "P1 - Eureka",
+      "item": [
+        {
+          "name": "01 Eureka dashboard",
+          "request": { "method": "GET", "url": "{{eurekaUrl}}/" },
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('Eureka 200', ()=> pm.response.to.have.status(200));"] } }]
+        },
+        {
+          "name": "02 Eureka apps registradas",
+          "request": { "method": "GET", "header": [{ "key": "Accept", "value": "application/json" }], "url": "{{eurekaUrl}}/eureka/apps" },
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('200', ()=> pm.response.to.have.status(200));", "pm.test('MS-RECLAMOS y MS-RESOLUCION registrados', ()=>{ const b = pm.response.text(); pm.expect(b.toUpperCase()).to.include('MS-RECLAMOS'); pm.expect(b.toUpperCase()).to.include('MS-RESOLUCION'); });"] } }]
+        }
+      ]
+    },
+    {
+      "name": "P2 - Reclamos",
+      "item": [
+        {
+          "name": "01 Registrar reclamo",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"fechareclamo\": \"2026-10-10\",\n  \"nomcliente\": \"Juan Perez\",\n  \"ultimos4tarjeta\": \"4521\",\n  \"motivo\": \"Consumo desconocido por S/ 250.00\"\n}" },
+            "url": "{{reclamosUrl}}/reclamos"
+          },
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('201 creado', ()=> pm.response.to.have.status(201));", "const b = pm.response.json();", "pm.test('defaults: analista No asignado, estado 1, por evaluar', ()=>{ pm.expect(b.analista).to.eql('No asignado'); pm.expect(b.estado).to.eql(1); pm.expect(b.observacion).to.eql('por evaluar'); });", "pm.collectionVariables.set('numreclamo', b.numreclamo);"] } }]
+        },
+        {
+          "name": "02 Consultar por numero",
+          "request": { "method": "GET", "url": "{{reclamosUrl}}/reclamos/{{numreclamo}}" },
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('200', ()=> pm.response.to.have.status(200));"] } }]
+        },
+        {
+          "name": "03 Listar reclamos",
+          "request": { "method": "GET", "url": "{{reclamosUrl}}/reclamos" },
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('200 array', ()=>{ pm.response.to.have.status(200); pm.expect(pm.response.json()).to.be.an('array'); });"] } }]
+        },
+        {
+          "name": "04 Actualizar reclamo (uso P3)",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"estado\": 1,\n  \"analista\": \"Ana Torres\",\n  \"observacion\": \"En revision inicial\"\n}" },
+            "url": "{{reclamosUrl}}/reclamos/{{numreclamo}}"
+          },
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('200', ()=> pm.response.to.have.status(200));"] } }]
+        }
+      ]
+    },
+    {
+      "name": "P3 - Resolucion (Feign)",
+      "item": [
+        {
+          "name": "01 Resolver PROCEDENTE (estado 2)",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"estado\": 2,\n  \"analista\": \"Rosa Riesgos\",\n  \"observacion\": \"Consumo no reconocido, se procede a devolucion\"\n}" },
+            "url": "{{resolucionUrl}}/resoluciones/{{numreclamo}}"
+          },
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('200 resuelto PROCEDENTE', ()=>{ pm.response.to.have.status(200); const b = pm.response.json(); pm.expect(b.estado).to.eql(2); pm.expect(b.estadoDescripcion).to.eql('PROCEDENTE'); });"] } }]
+        },
+        {
+          "name": "02 Resolver IMPROCEDENTE (estado 3) - crear otro reclamo primero",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"estado\": 3,\n  \"analista\": \"Luis Riesgos\",\n  \"observacion\": \"Consumo validado con comercio, improcedente\"\n}" },
+            "url": "{{resolucionUrl}}/resoluciones/{{numreclamo}}"
+          },
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('200 resuelto IMPROCEDENTE', ()=>{ pm.response.to.have.status(200); pm.expect(pm.response.json().estado).to.eql(3); });"] } }]
+        },
+        {
+          "name": "03 Resolver inexistente (error 404)",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"estado\": 2,\n  \"analista\": \"Rosa Riesgos\",\n  \"observacion\": \"Prueba error\"\n}" },
+            "url": "{{resolucionUrl}}/resoluciones/9999"
+          },
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('404 no existe', ()=> pm.response.to.have.status(404));"] } }]
+        }
+      ]
+    }
+  ]
+}
